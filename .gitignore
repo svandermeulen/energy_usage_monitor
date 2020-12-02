@@ -2,6 +2,7 @@
 /data
 /output
 /__pycache__
+/.idea
 
 # FILES TO IGNORE
 *.pyc

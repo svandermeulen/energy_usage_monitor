@@ -3,6 +3,7 @@
 Written by: stef.vandermeulen
 Date: 12/17/2019
 """
+import json
 
 import colorlover as cl
 import numpy as np
@@ -14,15 +15,7 @@ from plotly.graph_objs import Figure
 
 from plotly.subplots import make_subplots
 
-PRICES = {
-    "prijs verbruik laag": 0.2033,
-    "prijs verbruik hoog": 0.2163,
-    "prijs verbruik gas": 0.7673,
-    "leveringskosten": 0.2281,
-    "netbeheerkosten_elektra": 0.6293,
-    "netbeheerkosten_gas": 0.4971,
-    "vermindering energiebelasting": 1.44
-}
+
 
 
 def create_dir(path: str) -> bool:
@@ -107,7 +100,7 @@ def compute_annual_usage(df: pd.DataFrame, columns: list) -> (pd.DataFrame, list
     return df, columns_annual
 
 
-def compute_costs(df: pd.DataFrame, columns: list) -> pd.DataFrame:
+def compute_costs(df: pd.DataFrame, columns: list, prices: dict) -> pd.DataFrame:
     column_e_total = ""
     column_g_total = ""
     for column in columns:
@@ -116,22 +109,22 @@ def compute_costs(df: pd.DataFrame, columns: list) -> pd.DataFrame:
             column_e_total = column_costs
             continue
         elif "laag" in column:
-            df[column_costs] = df[column] * PRICES["prijs verbruik laag"]
+            df[column_costs] = df[column] * prices["prijs verbruik laag"]
         elif "hoog" in column:
-            df[column_costs] = df[column] * PRICES["prijs verbruik hoog"]
+            df[column_costs] = df[column] * prices["prijs verbruik hoog"]
         else:
             column_g_total = column_costs
-            df[column_costs] = df[column] * PRICES["prijs verbruik gas"]
-            df[column_costs] = df[column_costs].add(365 * PRICES["leveringskosten"])
-            df[column_costs] = df[column_costs].add(365 * PRICES["netbeheerkosten_gas"])
+            df[column_costs] = df[column] * prices["prijs verbruik gas"]
+            df[column_costs] = df[column_costs].add(365 * prices["leveringskosten"])
+            df[column_costs] = df[column_costs].add(365 * prices["netbeheerkosten_gas"])
 
     columns_e = get_columns_electricity(columns=[c for c in df if "kosten" in c])
     assert column_e_total
     df[column_e_total] = df[columns_e].sum(axis=1)
-    df[column_e_total] = df[column_e_total].add(365 * PRICES["leveringskosten"])
-    df[column_e_total] = df[column_e_total].add(365 * PRICES["netbeheerkosten_elektra"])
+    df[column_e_total] = df[column_e_total].add(365 * prices["leveringskosten"])
+    df[column_e_total] = df[column_e_total].add(365 * prices["netbeheerkosten_elektra"])
     df["Kosten jaarlijks totaal"] = df[[column_e_total, column_g_total]].sum(axis=1)
-    df["Kosten jaarlijks totaal"] = df["Kosten jaarlijks totaal"].subtract(PRICES["vermindering energiebelasting"] * 365)
+    df["Kosten jaarlijks totaal"] = df["Kosten jaarlijks totaal"].subtract(prices["vermindering energiebelasting"] * 365)
 
     return df
 
@@ -140,8 +133,12 @@ def main():
     path_home = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path_data = os.path.join(path_home, "data")
     path_usage_data = os.path.join(path_data, "meter_standen.csv")
+    path_prices = os.path.join(path_data, 'energy_prices.json')
     path_output = os.path.join(path_home, "output")
     create_dir(path_output)
+
+    with open(path_prices, "r") as f:
+        energy_prices = json.load(f)
 
     df = pd.read_csv(path_usage_data, sep=";")
     df["Datum"] = pd.to_datetime(df["Datum"], format="%d-%m-%Y")
@@ -156,7 +153,7 @@ def main():
     df_days = df_days.sort_values(by="Datum").reset_index(drop=True)
     df_days, columns_delta = compute_daily_usage(df=df_days, columns=columns_usage)
     df_days, columns_annual = compute_annual_usage(df=df_days, columns=columns_delta)
-    df_days = compute_costs(df=df_days, columns=columns_annual)
+    df_days = compute_costs(df=df_days, columns=columns_annual, prices=energy_prices)
 
     path_html = os.path.join(path_output, "test.html")
     fig = plot_usage(df=df_days, columns=columns_usage)

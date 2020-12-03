@@ -16,8 +16,6 @@ from plotly.graph_objs import Figure
 from plotly.subplots import make_subplots
 
 
-
-
 def create_dir(path: str) -> bool:
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -26,7 +24,7 @@ def create_dir(path: str) -> bool:
 
 
 def plot_usage(df: pd.DataFrame, columns: list) -> Figure:
-    fig = make_subplots(rows=4, cols=1)
+    fig = make_subplots(rows=2, cols=2)
 
     colors = cl.scales[f"{len(columns)}"]["qual"]["Set1"]
     colors = {c: color for c, color in zip(columns, colors)}
@@ -46,22 +44,22 @@ def plot_usage(df: pd.DataFrame, columns: list) -> Figure:
         column_annual_delta = column_daily_delta + " jaarlijks"
         trace = go.Scatter(x=df["Datum"], y=df[column_annual_delta], showlegend=False, legendgroup=column,
                            marker=dict(color=colors[column]))
-        fig.append_trace(trace, 3, 1)
+        fig.append_trace(trace, 1, 2)
 
         if "gas" in column or "elektra" in column:
             column_costs = column_annual_delta + " kosten"
             trace = go.Scatter(x=df["Datum"], y=df[column_costs], showlegend=False, legendgroup=column,
                                marker=dict(color=colors[column]))
-            fig.append_trace(trace, 4, 1)
+            fig.append_trace(trace, 2, 2)
 
     column_totaal = "Kosten jaarlijks totaal"
     trace = go.Scatter(x=df["Datum"], y=df[column_totaal], showlegend=True, legendgroup=column_totaal,
                        name=column_totaal, marker=dict(color="black"))
-    fig.append_trace(trace, 4, 1)
+    fig.append_trace(trace, 2, 2)
 
     fig["layout"]["yaxis1"]["title"] = "Meterstand - offset"
-    fig["layout"]["yaxis2"]["title"] = "Verbruik per dag"
-    fig["layout"]["yaxis3"]["title"] = "Verbruik afgelopen jaar"
+    fig["layout"]["yaxis2"]["title"] = "Verbruik afgelopen jaar"
+    fig["layout"]["yaxis3"]["title"] = "Verbruik per dag"
     fig["layout"]["yaxis4"]["title"] = "Kosten afgelopen jaar"
 
     fig.update_layout(template="plotly_white")
@@ -124,7 +122,8 @@ def compute_costs(df: pd.DataFrame, columns: list, prices: dict) -> pd.DataFrame
     df[column_e_total] = df[column_e_total].add(365 * prices["leveringskosten"])
     df[column_e_total] = df[column_e_total].add(365 * prices["netbeheerkosten_elektra"])
     df["Kosten jaarlijks totaal"] = df[[column_e_total, column_g_total]].sum(axis=1)
-    df["Kosten jaarlijks totaal"] = df["Kosten jaarlijks totaal"].subtract(prices["vermindering energiebelasting"] * 365)
+    df["Kosten jaarlijks totaal"] = df["Kosten jaarlijks totaal"].subtract(
+        prices["vermindering energiebelasting"] * 365)
 
     return df
 
@@ -155,7 +154,7 @@ def main():
     df_days, columns_annual = compute_annual_usage(df=df_days, columns=columns_delta)
     df_days = compute_costs(df=df_days, columns=columns_annual, prices=energy_prices)
 
-    path_html = os.path.join(path_output, "test.html")
+    path_html = os.path.join(path_output, "daily_usage.html")
     fig = plot_usage(df=df_days, columns=columns_usage)
     py.offline.plot(fig, filename=path_html, auto_open=True)
 
